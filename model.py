@@ -13,6 +13,7 @@ class Network(nn.Module):
         )
         self.classifier = nn.Linear(self.model.num_features, num_classes)
         self.metric_losses = metric_losses
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         features = self.model(x)
