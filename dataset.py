@@ -2,6 +2,7 @@ import librosa
 import numpy as np
 import os.path as Path
 import pandas as pd
+import torch
 from torch.utils.data import Dataset
 
 
@@ -10,7 +11,7 @@ class BirdClefDataset(Dataset):
         self.meta = pd.read_csv(path_meta)
         self.sr = sr
         self.num_classes = len(self.meta["primary_label"].unique())
-        self.SPEC_HEIGHT = 64
+        self.SPEC_HEIGHT = 80
         self.SPEC_WIDTH = 256
         self.FMIN = 200
         self.FMAX = 12500
@@ -38,4 +39,24 @@ class BirdClefDataset(Dataset):
         spectr = self.read_ogg(wave_path)
         label = np.zeros(self.num_classes, dtype=np.float32) + 0.0025  # Label smoothing
         label[row["label_id"]] = 0.995
-        return spectr, label
+        return torch.tensor(spectr), torch.tensor(label)
+
+
+def collate_fn(batch):
+    print(type(batch[0][0]))
+    print(batch[0][0].shape)
+    batch = sorted(batch, key=lambda sample: sample[0].size(1), reverse=True)
+    longest_sample = max(batch, key=lambda sample: sample[0].size(1))[0]
+    freq_size = longest_sample.size(0)
+    minibatch_size = len(batch)
+    max_seqlength = longest_sample.size(1)
+    inputs = torch.zeros(minibatch_size, 1, freq_size, max_seqlength)
+    input_percentages = torch.FloatTensor(minibatch_size)
+    targets = []
+    for x in range(minibatch_size):
+        tensor, target = batch[x]
+        seq_length = tensor.size(1)
+        inputs[x][0].narrow(1, 0, seq_length).copy_(tensor)
+        input_percentages[x] = seq_length / float(max_seqlength)
+        targets.append(target)
+    return inputs, targets, input_percentages
