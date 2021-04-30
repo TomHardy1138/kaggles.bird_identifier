@@ -42,7 +42,7 @@ class ArcfaceLoss(nn.Module):
         self.gamma = 1.0
         self.pr_product = pr_product
 
-    def forward(self, logits, labels, iteration):
+    def forward(self, logits, labels):
         if self.pr_product:
             pr_alpha = torch.sqrt(1.0 - logits.pow(2.0))
             logits = pr_alpha.detach() * logits + logits.detach() * (1.0 - pr_alpha)
