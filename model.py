@@ -14,6 +14,7 @@ class Network(nn.Module):
         self.start_conv = nn.Conv2d(1, 3, (3, 3))
         self.classifier = nn.Linear(self.model.num_features, num_classes)
         self.metric_losses = metric_losses
+        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         features = self.model(self.start_conv(x))
