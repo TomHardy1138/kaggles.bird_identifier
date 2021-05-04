@@ -11,7 +11,7 @@ if __name__ == '__main__':
 
     dataset = BirdClefDataset()
     loader = DataLoader(dataset, collate_fn=collate_fn,
-                        batch_size=24, num_workers=4,
+                        batch_size=16, num_workers=4,
                         sampler=torch.utils.data.RandomSampler(dataset))
     model = Network(backbone='resnest50d', num_classes=397)
     model.cuda()
