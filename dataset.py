@@ -70,8 +70,6 @@ class BirdClefDataset(Dataset):
 
 
 def collate_fn(batch):
-    # print(type(batch[0][0]))
-    # print(batch[0][0].shape)
     batch = sorted(batch, key=lambda sample: sample[0].size(1), reverse=True)
     longest_sample = max(batch, key=lambda sample: sample[0].size(1))[0]
     freq_size = longest_sample.size(0)
