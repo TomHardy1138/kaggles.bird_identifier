@@ -7,24 +7,29 @@ from dataset import BirdClefDataset, collate_fn
 from model import Network
 
 
-dataset = BirdClefDataset()
-loader = DataLoader(dataset, collate_fn=collate_fn, batch_size=4, num_workers=4)
-model = Network(backbone='resnet34', num_classes=397)
-model.cuda()
+if __name__ == '__main__':
 
-criterion = nn.BCELoss()
-optimizer = torch.optim.SGD(model.parameters(), lr=3e-2)
-for i, (data, target, _) in enumerate(loader):
-    # print(data.shape)
-    x = F.conv2d(data, torch.ones(3,1,3,3))
-    # print(x.shape)
-    out = model(x.cuda())
-    # print(out.shape)
-    # print(target)
-    # print(torch.stack(target).shape)
-    target = torch.stack(target)
-    loss = criterion(F.sigmoid(out), target.cuda())
-    print(loss.item())
-    loss.backward()
-    optimizer.step()
-    optimizer.zero_grad()
+    dataset = BirdClefDataset()
+    loader = DataLoader(dataset, collate_fn=collate_fn,
+                        batch_size=16, num_workers=4,
+                        sampler=torch.utils.data.RandomSampler(dataset))
+    model = Network(backbone='resnest50d', num_classes=397)
+    model.cuda()
+
+    criterion = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
+    for i, (data, target) in enumerate(loader):
+        # print(data.shape)
+        # print(x.shape)
+        data = data.cuda()
+        out = model(data)
+        # print(out.shape)
+        # print(target)
+        # print(torch.stack(target).shape)
+        target = target.cuda()
+        loss = criterion(out, target.cuda())
+        print(loss.item())
+        print(torch.sum(torch.argmax(out, 1) == torch.argmax(target, 1)).item() / data.size(0))
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
