@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torch.optim.lr_scheduler import StepLR
 import tqdm
+from sklearn.metrics import f1_score, accuracy_score
 
 from dataset import BirdClefDataset, collate_fn
 from model import Network
@@ -13,22 +14,24 @@ from utils import AverageMeter
 
 def evaluate(model, loader):
     print("\nStart validation")
+    model.eval()
     loss_meter = AverageMeter()
-    acc_meter = AverageMeter()
+    pred_label = []
+    target_label = []
     for i, (data, target) in enumerate(tqdm.tqdm(loader)):
         data = data.cuda()
         with torch.no_grad():
             out = model(data)
             target = target.cuda()
             loss = criterion(out, target)
-        accuracy = torch.sum(torch.argmax(out, 1) == torch.argmax(target, 1))
+        pred_label += list(torch.argmax(out, 1).cpu().numpy())
+        target_label += list(torch.argmax(target, 1).cpu().numpy())
         loss_meter.update(loss.item())
-        acc_meter.update(accuracy.item())
         print(loss.item())
-        print(accuracy.item() / data.size(0))
 
     print(f"Validation loss {loss_meter.avg}")
-    print(f"Validation accuracy {acc_meter.avg}")
+    print(f"Validation accuracy {accuracy_score(target_label, pred_label)}")
+    print(f"Validation f1 {f1_score(target_label, pred_label, average='weighted')}")
 
 
 def train(model, criterion, optimizer, train_loader, val_loader, epochs):
@@ -58,12 +61,17 @@ def train(model, criterion, optimizer, train_loader, val_loader, epochs):
 
 
 if __name__ == '__main__':
-    dataset = BirdClefDataset()
-    loader = DataLoader(dataset, collate_fn=collate_fn,
-                        batch_size=32, num_workers=4,
-                        sampler=torch.utils.data.RandomSampler(dataset))
-    model = Network(backbone='resnest50d', num_classes=397)
+    train_dataset = BirdClefDataset(path_meta='data/train_90.csv')
+    test_dataset = BirdClefDataset(path_meta='data/test_10.csv')
+    loader = DataLoader(train_dataset, collate_fn=collate_fn,
+                        batch_size=64, num_workers=8,
+                        sampler=torch.utils.data.RandomSampler(train_dataset))
+    test_loader = DataLoader(test_dataset, collate_fn=collate_fn,
+                             batch_size=64, num_workers=8,
+                             sampler=torch.utils.data.RandomSampler(test_dataset))
+    model = Network(backbone='resnet34', num_classes=397)
     model.cuda()
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=3e-4)
-    train(model, criterion, optimizer, loader, loader, 7)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
+    train(model, criterion, optimizer, loader, test_loader, 15)
+    torch.save(model, 'resnet34_model.pth')
