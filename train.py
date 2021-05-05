@@ -34,7 +34,7 @@ def evaluate(model, loader):
     print(f"Validation f1 {f1_score(target_label, pred_label, average='weighted')}")
 
 
-def train(model, criterion, optimizer, train_loader, val_loader, epochs):
+def train(model, criterion, optimizer, scheduler, train_loader, val_loader, epochs):
     print("Start training")
     for epoch in range(1, epochs + 1):
         start_epoch_time = time.time()
@@ -49,10 +49,12 @@ def train(model, criterion, optimizer, train_loader, val_loader, epochs):
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
+            scheduler.step()
             loss_meter.update(loss.item())
             acc_meter.update(accuracy.item())
             print(f" Loss: {loss_meter.val:.5f} Acc: {acc_meter.val:.5f} Acc mean: {acc_meter.avg:.5f}")
         end_epoch_time = time.time()
+        torch.save(model.state_dict(), f"model_{epoch}.pth")
         print(f"Epoch loss {loss_meter.avg}")
         print(f"Epoch accuracy (train) {acc_meter.avg}")
         print(f"{epoch} Epoch time (m): ", (end_epoch_time - start_epoch_time) / 60)
@@ -73,5 +75,6 @@ if __name__ == '__main__':
     model.cuda()
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
-    train(model, criterion, optimizer, loader, test_loader, 15)
-    torch.save(model, 'resnet34_model.pth')
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,80], gamma=0.1)
+    train(model, criterion, optimizer, scheduler, loader, test_loader, 15)
+    torch.save(model.state_dict(), 'resnet34_model_last.pth')
