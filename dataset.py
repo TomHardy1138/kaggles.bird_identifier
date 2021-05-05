@@ -16,15 +16,9 @@ class BirdClefDataset(Dataset):
         self.window_stride = 0.012
         self.window_size = 0.03
         self.meta = pd.read_csv(path_meta)
-        self.sr = sr
         self.num_classes = len(self.meta["primary_label"].unique())
-        self.SPEC_HEIGHT = 80
-        self.SPEC_WIDTH = 256
-        self.FMIN = 200
-        self.FMAX = 12500
+        self.Melbins = 80
         self.amplitude = torchaudio.transforms.AmplitudeToDB()
-        # self.n_fft = int(self.sr * (self.window_size + 1e-8))
-        # self.hop_length = int(self.sr * (self.window_stride + 1e-8))
 
     def read_ogg(self, path):
         data, sample_rate = torchaudio.load(path)
@@ -35,26 +29,11 @@ class BirdClefDataset(Dataset):
         if 0 < self.crop < audio_len:
             start = random.randint(0, int(sample_rate * (audio_len - self.crop)))
             data = data[:, start: start + int(self.crop * sample_rate)]
+        #TODO: Проверить sample rate на одинаковость
         spect = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_fft=1024,
                                                      hop_length=hop_length, win_length=window_length)(data)
         spect = self.amplitude(spect)
-        return spect[0, :self.SPEC_HEIGHT]
-        # D = librosa.stft(data, n_fft=self.n_fft, hop_length=self.hop_length,
-        #                  win_length=self.n_fft, window='hamming')
-        # spect, phase = librosa.magphase(D)
-        # 3x faster
-        # spect = np.abs(D)
-
-        # spectr = librosa.feature.melspectrogram(
-        #     y=data,
-        #     sr=sample_rate,
-        #     n_fft=512,
-        #     hop_length=int(sample_rate * 5 / (self.SPEC_WIDTH - 1)),
-        #     n_mels=self.SPEC_HEIGHT,
-        #     fmin=self.FMIN,
-        #     fmax=self.FMAX
-        # )
-        # return librosa.power_to_db(spectr)
+        return spect[0, :self.Melbins]
 
     def __len__(self):
         return len(self.meta)

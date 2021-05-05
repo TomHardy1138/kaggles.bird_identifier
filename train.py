@@ -9,7 +9,6 @@ from sklearn.metrics import f1_score, accuracy_score
 
 from dataset import BirdClefDataset, collate_fn
 from model import Network
-from model_stt import DeepSpeech
 from utils import AverageMeter
 
 
@@ -61,22 +60,6 @@ def train(model, criterion, optimizer, scheduler, train_loader, val_loader, epoc
         print(f"{epoch} Epoch time (m): ", (end_epoch_time - start_epoch_time) / 60)
 
         evaluate(model, val_loader)
-
-
-def get_model():
-    model = DeepSpeech(
-        rnn_hidden_size=256,
-        cnn_width=256,
-        nb_layers=15,
-        # labels=labels,
-        rnn_type='cnn_residual_repeat_sep_down8',
-        # audio_conf=audio_conf,
-        # bidirectional=args.bidirectional,
-        # bnm=args.batch_norm_momentum,
-        dropout=0.1,
-        kernel_size=13,
-    )
-    return model
 
 
 if __name__ == '__main__':
