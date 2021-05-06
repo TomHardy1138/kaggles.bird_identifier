@@ -250,11 +250,11 @@ class DeepSpeech(nn.Module):
         self._kernel_size = kernel_size
 
         self.gap = nn.Sequential(
-            nn.AdaptiveAvgPool1d(16),
+            nn.AdaptiveAvgPool1d(4),
             nn.Flatten(),
-            nn.Linear(16*num_classes, num_classes),
-            nn.BatchNorm1d(num_classes),
-            nn.Linear(num_classes, num_classes),
+            nn.Linear(4*num_classes, num_classes),
+            # nn.BatchNorm1d(num_classes),
+            # nn.Linear(num_classes, num_classes),
         )
 
         sample_rate = self._audio_conf.get("sample_rate", 16000)
@@ -299,11 +299,12 @@ class DeepSpeech(nn.Module):
                     'bnm': self._bnm,
                     'dropout': dropout,
                     'cnn_width': self._cnn_width,  # cnn filters
-                    'not_glu': self._bidirectional,  # glu or basic relu
+                    'not_glu': True,  # glu or basic relu
                     'repeat_layers': self._hidden_layers,  # depth, only middle part
                     'kernel_size': self._kernel_size,
                     'se_ratio': 0.25,
-                    'skip': True
+                    'skip': True,
+                    'groups': 4,
                 })
             )
             self.fc = nn.Sequential(
@@ -412,9 +413,9 @@ class DeepSpeech(nn.Module):
                     'se_ratio': 0.2,
                     'skip': True,
                     'separable': True,
-                    'add_downsample': 4,
+                    'add_downsample': 2,
                     'dilated_blocks': [],  # no dilation
-                    'groups': 12  # optimal group count, 768 // 12 = 64
+                    'groups': 8  # optimal group count, 768 // 12 = 64
                 })
             )
             # https://arxiv.org/abs/1905.09788
@@ -861,36 +862,19 @@ class DeepSpeech(nn.Module):
             x = self.fc(x)
             x = x.transpose(1, 2).transpose(0, 1).contiguous()
         else:
-            # x = self.dropout1(x)
             x, _ = self.conv(x)
-            # x = self.dropout2(x)
             if DEBUG: assert x.is_cuda
-            # x = x.to('cuda')
             sizes = x.size()
             x = x.view(sizes[0], sizes[1] * sizes[2], sizes[3])  # Collapse feature dimension
             x = x.transpose(1, 2).transpose(0, 1).contiguous()  # TxNxH
-            # assert x.is_cuda
 
             for rnn in self.rnns:
                 x = rnn(x)
-                # assert x.is_cuda
-
-            if not self._bidirectional:  # no need for lookahead layer in bidirectional
-                x = self.lookahead(x)
-                # assert x.is_cuda
 
             x = self.fc(x)
-        # if not DEBUG: assert x.is_cuda
         x = x.permute(1, 2, 0)
         x = self.gap(x)
-        print(x.shape)
-
-        # identity in training mode, softmax in eval mode
         outs = F.softmax(x, dim=-1)
-
-        # if not DEBUG: assert outs.is_cuda
-        # if not DEBUG: assert output_lengths.is_cuda
-        # logits = F.log_softmax(x, 1)
         return x, outs
 
     @classmethod
@@ -1158,6 +1142,7 @@ class ResidualWav2Letter(nn.Module):
         padding = kernel_size // 2
         se_ratio = config.se_ratio
         skip = config.skip
+        groups = config.groups
 
         # "prolog"
         modules = [ResCNNBlock(_in=80, out=cnn_width, kernel_size=kernel_size,
@@ -1168,7 +1153,7 @@ class ResidualWav2Letter(nn.Module):
         # main convs
         for _ in range(0, repeat_layers):
             modules.extend(
-                [ResCNNBlock(_in=cnn_width, out=cnn_width, kernel_size=kernel_size,
+                [ResCNNBlock(_in=cnn_width, out=cnn_width, kernel_size=kernel_size, groups=groups,
                              padding=padding, stride=1, bnm=bnm, bias=not bnorm, dropout=dropout,
                              nonlinearity=nn.ReLU(inplace=True),
                              se_ratio=se_ratio, skip=skip)]
@@ -1209,7 +1194,7 @@ class ResidualRepeatWav2Letter(nn.Module):
         self.groups = config.groups if 'groups' in config else 1
         self.decoder_type = config.decoder_type if 'decoder_type' in config else 'pointwise'
         self.num_classes = config.num_classes if 'num_classes' in config else 0
-        self.nonlinearity = config.nonlinearity if 'nonlinearity' in config else Swish()
+        self.nonlinearity = config.nonlinearity if 'nonlinearity' in config else nn.ReLU()
         decoder_layers = config.decoder_layers if 'decoder_layers' in config else 2
         vary_cnn_width = config.vary_cnn_width if 'vary_cnn_width' in config else False
 
@@ -1600,6 +1585,7 @@ class ResCNNBlock(nn.Module):
                  bias=True,
                  se_ratio=0,
                  skip=False,
+                 groups=1,
                  inverted_bottleneck=False):
         super(ResCNNBlock, self).__init__()
 
@@ -1608,7 +1594,7 @@ class ResCNNBlock(nn.Module):
                               kernel_size,
                               stride=stride,
                               padding=padding,
-                              bias=bias)
+                              bias=bias, groups=groups)
         self.norm = nn.BatchNorm1d(out,
                                    momentum=bnm)
         self.nonlinearity = nonlinearity
