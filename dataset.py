@@ -29,7 +29,6 @@ class BirdClefDataset(Dataset):
         if 0 < self.crop < audio_len:
             start = random.randint(0, int(sample_rate * (audio_len - self.crop)))
             data = data[:, start: start + int(self.crop * sample_rate)]
-        #TODO: Проверить sample rate на одинаковость
         spect = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_fft=1024,
                                                      hop_length=hop_length, win_length=window_length)(data)
         spect = self.amplitude(spect)
@@ -44,7 +43,8 @@ class BirdClefDataset(Dataset):
         # wave_path = "train_short_audio/" + row["path"]
         wave_path = Path.join("train_short_audio", row["path"])
         spectr = self.read_ogg(wave_path)
-        label = np.zeros(self.num_classes, dtype=np.float32) + 0.0025  # Label smoothing
+        # TODO: Add augs here
+        label = np.zeros(self.num_classes, dtype=np.float32) + 0.003  # Label smoothing
         label[row["label_id"]] = 0.995
         # print(spectr.shape)
         return spectr, torch.tensor(label)

@@ -10,6 +10,7 @@ from sklearn.metrics import f1_score, accuracy_score
 from dataset import BirdClefDataset, collate_fn
 from model import Network
 from utils import AverageMeter
+from model_stt import DeepSpeech
 
 
 def evaluate(model, loader):
@@ -34,6 +35,17 @@ def evaluate(model, loader):
     print(f"Validation f1 {f1_score(target_label, pred_label, average='weighted')}")
 
 
+def get_model():
+    return DeepSpeech(
+        rnn_type='cnn_residual',
+        rnn_hidden_size=384,
+        cnn_width=384,
+        dropout=0.05,
+        nb_layers=10,
+        kernel_size=11,
+    )
+
+
 def train(model, criterion, optimizer, scheduler, train_loader, val_loader, epochs):
     print("Start training")
     for epoch in range(1, epochs + 1):
@@ -51,7 +63,10 @@ def train(model, criterion, optimizer, scheduler, train_loader, val_loader, epoc
             optimizer.zero_grad()
             loss_meter.update(loss.item())
             acc_meter.update(accuracy.item())
-            print(f" Loss: {loss_meter.val:.5f} Acc: {acc_meter.val:.5f} Acc mean: {acc_meter.avg:.5f}")
+            print(f" Loss: {loss_meter.val:.5f} "
+                  f"Acc: {acc_meter.val:.5f} "
+                  f"Acc mean: {acc_meter.avg:.5f}"
+                  f"lr: {scheduler.get_lr()}")
         scheduler.step()
         end_epoch_time = time.time()
         torch.save(model.state_dict(), f"seresnext26t_32x4d_model_{epoch}.pth")
@@ -78,3 +93,4 @@ if __name__ == '__main__':
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 15], gamma=0.8)
     train(model, criterion, optimizer, scheduler, loader, test_loader, 15)
     torch.save(model.state_dict(), 'seresnext26t_32x4d_model_last.pth')
+
