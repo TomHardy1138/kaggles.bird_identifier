@@ -49,12 +49,12 @@ def train(model, criterion, optimizer, scheduler, train_loader, val_loader, epoc
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-            scheduler.step()
             loss_meter.update(loss.item())
             acc_meter.update(accuracy.item())
             print(f" Loss: {loss_meter.val:.5f} Acc: {acc_meter.val:.5f} Acc mean: {acc_meter.avg:.5f}")
+        scheduler.step()
         end_epoch_time = time.time()
-        torch.save(model.state_dict(), f"model_{epoch}.pth")
+        torch.save(model.state_dict(), f"seresnext26t_32x4d_model_{epoch}.pth")
         print(f"Epoch loss {loss_meter.avg}")
         print(f"Epoch accuracy (train) {acc_meter.avg}")
         print(f"{epoch} Epoch time (m): ", (end_epoch_time - start_epoch_time) / 60)
@@ -66,15 +66,15 @@ if __name__ == '__main__':
     train_dataset = BirdClefDataset(path_meta='data/train_90.csv')
     test_dataset = BirdClefDataset(path_meta='data/test_10.csv')
     loader = DataLoader(train_dataset, collate_fn=collate_fn,
-                        batch_size=64, num_workers=8,
+                        batch_size=24, num_workers=8,
                         sampler=torch.utils.data.RandomSampler(train_dataset))
     test_loader = DataLoader(test_dataset, collate_fn=collate_fn,
-                             batch_size=64, num_workers=8,
+                             batch_size=24, num_workers=8,
                              sampler=torch.utils.data.RandomSampler(test_dataset))
-    model = Network(backbone='resnet34', num_classes=397)
+    model = Network(backbone='seresnext26t_32x4d', num_classes=397)
     model.cuda()
     criterion = nn.BCEWithLogitsLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=2e-4)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30,80], gamma=0.1)
+    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 15], gamma=0.8)
     train(model, criterion, optimizer, scheduler, loader, test_loader, 15)
-    torch.save(model.state_dict(), 'resnet34_model_last.pth')
+    torch.save(model.state_dict(), 'seresnext26t_32x4d_model_last.pth')
