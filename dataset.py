@@ -7,10 +7,41 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import torchaudio
+from audiomentations import (
+    Compose,
+    AddGaussianSNR,
+    Shift,
+    TimeStretch,
+    TimeMask,
+    FrequencyMask,
+    PolarityInversion
+)
+
+
+def make_transform():
+    return Compose(
+        [
+            FrequencyMask(
+                min_frequency_band=0.005,
+                max_frequency_band=0.10,
+                p=0.25
+            ),
+            TimeStretch(
+                min_rate=0.15,
+                max_rate=.25,
+                p=0.25
+            ),
+            AddGaussianSNR(
+                min_SNR=0.001,
+                max_SNR=.25,
+                p=0.25
+            )
+        ]
+    )
 
 
 class BirdClefDataset(Dataset):
-    def __init__(self, path_meta="train.csv", crop=15):
+    def __init__(self, path_meta="train.csv", crop=15, augment=False):
         self.crop = crop
         self.window = ''
         self.window_stride = 0.012
@@ -20,6 +51,7 @@ class BirdClefDataset(Dataset):
         self.num_classes = len(self.meta["primary_label"].unique())
         self.Melbins = 80
         self.amplitude = torchaudio.transforms.AmplitudeToDB()
+        self.transforms = make_transform() if augment else None
 
     def read_ogg(self, path):
         data, sample_rate = torchaudio.load(path)
@@ -29,6 +61,11 @@ class BirdClefDataset(Dataset):
         if 0 < self.crop < audio_len:
             start = random.randint(0, int(sample_rate * (audio_len - self.crop)))
             data = data[:, start: start + int(self.crop * sample_rate)]
+
+        if self.transforms is not None:
+            data = self.transforms(data.numpy(), sample_rate=sample_rate)
+            data = torch.from_numpy(data)
+
         spect = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_fft=1024,
                                                      hop_length=hop_length, win_length=window_length)(data)
         spect = self.amplitude(spect)
