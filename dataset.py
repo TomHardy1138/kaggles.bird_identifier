@@ -10,19 +10,19 @@ import torchaudio
 
 
 class BirdClefDataset(Dataset):
-    def __init__(self, path_meta="train.csv", sr=32000, crop=15):
+    def __init__(self, path_meta="train.csv", crop=15):
         self.crop = crop
         self.window = ''
         self.window_stride = 0.012
         self.window_size = 0.03
         self.meta = pd.read_csv(path_meta)
+        # print(self.meta.iloc[:, :5])
         self.num_classes = len(self.meta["primary_label"].unique())
         self.Melbins = 80
         self.amplitude = torchaudio.transforms.AmplitudeToDB()
 
     def read_ogg(self, path):
         data, sample_rate = torchaudio.load(path)
-        data = data
         audio_len = data.size(1) / sample_rate
         window_length = int(sample_rate * (self.window_size + 1e-8))
         hop_length = int(sample_rate * (self.window_stride + 1e-8))
@@ -33,6 +33,7 @@ class BirdClefDataset(Dataset):
         spect = torchaudio.transforms.MelSpectrogram(sample_rate=sample_rate, n_fft=1024,
                                                      hop_length=hop_length, win_length=window_length)(data)
         spect = self.amplitude(spect)
+        # np.array_split()
         return spect[0, :self.Melbins]
 
     def __len__(self):
@@ -45,6 +46,7 @@ class BirdClefDataset(Dataset):
         spectr = self.read_ogg(wave_path)
         label = np.zeros(self.num_classes, dtype=np.float32) + 0.0025  # Label smoothing
         label[row["label_id"]] = 0.995
+        # print(spectr.shape)
         return spectr, torch.tensor(label)
 
 
@@ -62,4 +64,5 @@ def collate_fn(batch):
         seq_length = tensor.size(1)
         inputs[x][0].narrow(1, 0, seq_length).copy_(tensor)
         targets.append(target)
+    # print(inputs.shape)
     return inputs, torch.stack(targets) #input_percentages
